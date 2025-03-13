@@ -2,7 +2,7 @@ name: Build mod_cfml WinX64 Apache2.4 VC17
 on: [push, pull_request]
 
 jobs:
-  build-mod_cfml_win_VC17:
+  build-win_VC17:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,7 +40,7 @@ jobs:
           name: mod_cfml.so VC17
           path: D:\a\mod_cfml\mod_cfml\build\Release\mod_cfml.so
 
-  build-mod_cfml_linux_x64:
+  build-ubuntu_linux_x64:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,15 +49,16 @@ jobs:
       - name: build
         run: |
           cd C
+          pwd
           sudo make
-          sudo install
+          sudo make install
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: mod_cfml.so Linux Ubuntu x64
           path: /usr/libexec/apache2/mod_cfml.so
 
-  build-mod_cfml_linux_arm64:
+  build-ubuntu_linux_arm64:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
@@ -66,8 +67,9 @@ jobs:
       - name: build
         run: |
           cd C
+          pwd
           sudo make
-          sudo install
+          sudo make install
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
