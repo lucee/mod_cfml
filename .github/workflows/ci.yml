@@ -1,0 +1,41 @@
+name: Build mod_cfml WinX64 Apache2.4 VC17
+on: [push, pull_request]
+
+jobs:
+  build-mod_cfml_win_VC17:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1  # Activates MSVC compiler tools
+
+      - name: Download Apache httpd-2.4.63-250207-win64-VS17
+        shell: cmd
+        run: |
+            curl -O https://www.apachelounge.com/download/VS17/binaries/httpd-2.4.63-250207-win64-VS17.zip
+            unzip httpd-2.4.63-250207-win64-VS17.zip
+
+      - name: Configure and Build with cMake and nmake
+        shell: cmd
+        run: |
+            pwd
+            mkdir build
+            cd build
+            echo ---------Running cmake---------
+            cmake -DCMAKE_INSTALL_PREFIX="D:/a/mod_cfml/mod_cfml/Apache24" -G "NMake Makefiles" -G "Visual Studio 17 2022"  -DCMAKE_BUILD_TYPE=RelWithDebInfo D:/a/mod_cfml/mod_cfml/C
+
+      - name: Build Release
+        shell: cmd
+        run: cmake --build build --config Release
+
+      - name: Dump dirs
+        shell: cmd
+        run: |
+            dir /s D:\a\mod_cfml\mod_cfml\build\
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mod_cfml.so VC17
+          path: D:\a\mod_cfml\mod_cfml\build\Release\mod_cfml.so
