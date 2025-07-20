@@ -1,8 +1,23 @@
-name: Build mod_cfml WinX64 Apache2.4 VC17
+name: Build mod_cfml
 on: [push, pull_request]
 
 jobs:
-  build-win_VC17:
+  build-java:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build
+        run: |
+          cd java/mod_cfml-valve
+          pwd
+          ant
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mod_cfml-valve.jar
+          path: java/mod_cfml-valve/dist/mod_cfml-valve.jar
+
+          build-win_VC17:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
