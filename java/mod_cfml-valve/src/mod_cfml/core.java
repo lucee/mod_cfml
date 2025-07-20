@@ -20,6 +20,7 @@ package mod_cfml;
  * 1.1.09: May 1, 2019, Paul Klinkenberg (fixing broken 1.1.06 code; creating contexts thread-safe)
  * 1.1.10: June 5, 2019, Paul Klinkenberg (#24; improved redirect loop detection procedure: only add querystring param when necessary)
  * 1.1.11: August 26, 2019, Jordan Michaels - added response code option (issue 26)
+ * 2.0.0  Feb 27, 2025 Migrate to Jakarta from Javax
  * 	!!!!**** Update Version number in
  *			'private String versionNumber'
  * 			as well *****!!!!!
@@ -40,7 +41,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 // servlet
-import javax.servlet.ServletException;
+import jakarta.servlet.ServletException;
 
 // apache tomcat
 import org.apache.catalina.Host;
@@ -57,8 +58,7 @@ import org.apache.catalina.LifecycleException;
 public class core extends ValveBase implements Serializable {
 
 
-	private String versionNumber = "1.1.11";
-
+	private String versionNumber = "2.0.0";
 
 	// declare configurable param defaults
 	private boolean loggingEnabled = false;
@@ -548,7 +548,7 @@ public class core extends ValveBase implements Serializable {
 			System.out.println("[mod_cfml]["+logNr+"] INFO: Redirect URL => '" + tcRedirectURL + "'");
 		}
 
-		response.sendRedirect(response.encodeRedirectUrl(tcRedirectURL), responseCode);
+		response.sendRedirect(response.encodeRedirectURL(tcRedirectURL), responseCode);
 	}
 
 
