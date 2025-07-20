@@ -84,11 +84,11 @@ jobs:
           echo "Sanity Check Tomcat port 8888 (post restart)" | tee -a $GITHUB_STEP_SUMMARY
           curl http://127.0.0.1:8888/check.cfm?version=${{ env.LUCEE_CORE }} --fail-with-body >> $GITHUB_STEP_SUMMARY
 
-          echo "Sanity Check 127.0.0.1 Apache port 80 (post restart)" | tee -a $GITHUB_STEP_SUMMARY
-          curl http://127.0.0.1:80/check.cfm?version=${{ env.LUCEE_CORE }} --fail-with-body >> $GITHUB_STEP_SUMMARY
+          echo "Check localhost Apache port 80 (post restart)" | tee -a $GITHUB_STEP_SUMMARY
+          curl -L --max-redirs 5 http://localhost/check.cfm?version=${{ env.LUCEE_CORE }} --fail-with-body >> $GITHUB_STEP_SUMMARY
 
-          echo "Sanity Check localhost Apache port 80 (post restart)" | tee -a $GITHUB_STEP_SUMMARY
-          curl http://localhost/check.cfm?version=${{ env.LUCEE_CORE }} --fail-with-body >> $GITHUB_STEP_SUMMARY
+          echo "Check 127.0.0.1 Apache port 80 (post restart)" | tee -a $GITHUB_STEP_SUMMARY
+          curl -L --max-redirs 5 http://127.0.0.1/check.cfm?version=${{ env.LUCEE_CORE }} --fail-with-body >> $GITHUB_STEP_SUMMARY
 
       - name: Lucee Install logs
         if: ${{ always() }}
