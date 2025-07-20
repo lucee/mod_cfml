@@ -58,7 +58,7 @@ import org.apache.catalina.LifecycleException;
 public class core extends ValveBase implements Serializable {
 
 
-	private String versionNumber = "2.0.0";
+	private String versionNumber = "2.0.1";
 
 	// declare configurable param defaults
 	private boolean loggingEnabled = false;
