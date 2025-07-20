@@ -169,3 +169,27 @@ jobs:
 
             echo "----- access.log"
             sudo -s cat /var/log/apache2/access.log
+
+      - name: tomcat/conf/Catalina
+        if: ${{ always() }}
+        run: |
+            directory="/opt/lucee/tomcat/conf/Catalina"
+
+            # Check if the base directory exists
+            if [ ! -d "$directory" ]; then
+              echo "Directory not found: $directory"
+              exit 1
+            fi
+
+            # Loop through all regular files recursively
+            find "$directory" -type f | while IFS= read -r filepath; do
+              filename=$(basename "$filepath")
+              
+              echo "----------------------------------------"
+              echo "File Name: $filename"
+              echo "Full Path: $filepath"
+              echo "Contents:"
+              cat "$filepath"
+              echo "----------------------------------------"
+              echo
+            done
