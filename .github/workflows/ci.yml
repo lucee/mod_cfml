@@ -9,14 +9,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: build
         run: |
-          cd java/mod_cfml-value
+          cd java/mod_cfml-valve
           pwd
           ant
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: mod_cfml-valve.jar
-          path: java/mod_cfml-value/dist/mod_cfml-valve.jar
+          path: java/mod_cfml-valve/dist/mod_cfml-valve.jar
   build-win_VC17:
 
     runs-on: windows-latest
