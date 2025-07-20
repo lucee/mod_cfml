@@ -1,0 +1,144 @@
+name: Redirect tests
+
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+    inputs:
+      LUCEE_CORE_VERSION:
+        required: true
+        description: Lucee Version
+        type: string
+        default: 6.2.2.9-SNAPSHOT
+
+env:
+  LUCEE_INSTALLER_VERSION: 6.2.1.122
+  PUSH_LUCEE_TEST_VERSION: 6.2.2.76-SNAPSHOT
+  LUCEE_CORE:  ${{ github.event.inputs.LUCEE_CORE_VERSION }}
+jobs:
+  test-ubuntu-linux-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.1.1
+      - name: Set default version for Push workflows
+        if: github.event_name == 'push'
+        run: |
+          echo "LUCEE_CORE=${{ env.PUSH_LUCEE_TEST_VERSION }}" >> $GITHUB_ENV
+
+      - name: Cache Lucee Installer packages
+        uses: actions/cache@v4
+        with:
+          path: lucee-${{ env.LUCEE_INSTALLER_VERSION }}-linux-x64-installer.run
+          key: lucee-installer-cache
+
+      - name: Download Lucee Installer
+        run: |
+          if [ ! -f "lucee-${{ env.LUCEE_INSTALLER_VERSION }}-linux-x64-installer.run" ]; then
+            curl --fail https://cdn.lucee.org/lucee-${{ env.LUCEE_INSTALLER_VERSION }}-linux-x64-installer.run -o lucee-${{ env.LUCEE_INSTALLER_VERSION }}-linux-x64-installer.run -s
+          fi
+          ls -lH *.run
+
+          if [ ! -f "lucee-${{ env.LUCEE_CORE }}.jar" ]; then
+            curl --fail https://cdn.lucee.org/lucee-${{ env.LUCEE_CORE }}.jar -o lucee-${{ env.LUCEE_CORE }}.jar -s
+          fi
+          ls -lH *.jar
+
+      - name: Update and install Apache
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apache2
+
+      - name: Start Apache service
+        run: |
+          sudo systemctl start apache2
+          sudo systemctl enable apache2
+
+      - name: Verify Apache is running
+        run: |
+          sudo systemctl status apache2
+
+      - name: list dir
+        run: |
+          ls -l
+
+      - name: Run Lucee Linux installer
+        run: |
+          ls -l
+          chmod +x lucee-${{ env.LUCEE_INSTALLER_VERSION }}-linux-x64-installer.run
+          sudo ./lucee-${{ env.LUCEE_INSTALLER_VERSION }}-linux-x64-installer.run \
+            --mode unattended --installconn true --installmodcfml true --installiis false --startatboot false \
+            --luceepass ibtest --systemuser lucee --installjre true
+          echo "Write out simple test script to confirm Lucee / Java / Tomcat versions"
+
+          sudo -u lucee bash -c 'echo "<cfscript>if (server.lucee.version neq url.version) header statusCode=500;</cfscript><cfoutput>###### Lucee Linux #server.lucee.version#, using Java #server.java.version##chr(10)####### Running on #server.servlet.name#, OS #server.os.version# #server.os.arch#</cfoutput>" > /opt/lucee/tomcat/webapps/ROOT/check.cfm'
+
+      - name: Restart Lucee
+        run: |
+          sudo systemctl reload apache2
+          sudo /opt/lucee/lucee_ctl stop
+          # replace loader jar, allows testing 6 and 7
+          sudo rm /opt/lucee/lib/lucee-${{ env.LUCEE_INSTALLER_VERSION }}.jar
+          sudo cp lucee-${{ env.LUCEE_CORE }}.jar /opt/lucee/lib/lucee-${{ env.LUCEE_CORE }}.jar
+          sudo /opt/lucee/lucee_ctl start
+      - name: Run tests
+        run: |
+          echo "Sanity Check Tomcat port 8888 (post restart)" | tee -a $GITHUB_STEP_SUMMARY
+          curl http://127.0.0.1:8888/check.cfm?version=${{ env.LUCEE_CORE }} --fail-with-body >> $GITHUB_STEP_SUMMARY
+
+          echo "Sanity Check 127.0.0.1 Apache port 80 (post restart)" | tee -a $GITHUB_STEP_SUMMARY
+          curl http://127.0.0.1:80/check.cfm?version=${{ env.LUCEE_CORE }} --fail-with-body >> $GITHUB_STEP_SUMMARY
+
+          echo "Sanity Check localhost Apache port 80 (post restart)" | tee -a $GITHUB_STEP_SUMMARY
+          curl http://localhost/check.cfm?version=${{ env.LUCEE_CORE }} --fail-with-body >> $GITHUB_STEP_SUMMARY
+
+      - name: Lucee Install logs
+        if: ${{ always() }}
+        run: |
+            ls -l /tmp
+            cd /tmp
+            echo "----- installbuilder_installer.log"
+            sudo -s cat installbuilder_installer.log
+            cd /opt/lucee
+            echo "------ ls -lR /opt/lucee"
+            sudo ls -lR
+            echo "----- install.log"
+            sudo [ -r install.log ] && sudo -s cat install.log
+
+      - name: Tomcat / Lucee logs
+        if: ${{ always() }}
+        run: |
+            sudo ls -l /opt/lucee/tomcat/logs/
+            echo ""
+            echo ""
+            echo "----- catalina.out"
+            sudo [ -r /opt/lucee/tomcat/logs/catalina.out ] && sudo cat /opt/lucee/tomcat/logs/catalina.out
+
+            echo ""
+            echo ""
+            echo "----- deploy.log"
+            cat /opt/lucee/tomcat/lucee-server/context/logs/deploy.log
+
+            echo ""
+            echo ""
+            echo "----- exception.log"
+            cat /opt/lucee/tomcat/lucee-server/context/logs/exception.log
+
+            echo ""
+            echo ""
+            echo "----- application.log"
+            cat /opt/lucee/tomcat/lucee-server/context/logs/application.log
+
+            echo ""
+            echo ""
+            echo "----- out.log"
+            cat /opt/lucee/tomcat/lucee-server/context/logs/out.log
+
+      - name: Apache logs
+        if: ${{ always() }}
+        run: |
+            sudo -s ls -l /var/log/apache2/
+
+            echo "----- error.log"
+            sudo -s cat /var/log/apache2/error.log
+
+            echo "----- access.log"
+            sudo -s cat /var/log/apache2/access.log
