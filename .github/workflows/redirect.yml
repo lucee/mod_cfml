@@ -101,8 +101,9 @@ jobs:
           sudo /opt/lucee/lucee_ctl stop
           # replace loader jar, allows testing 6 and 7
           sudo rm /opt/lucee/lib/lucee-${{ env.LUCEE_INSTALLER_VERSION }}.jar
-          sudo rm /opt/lucee/lib/mod_cfml-valve_*
-          sudo cp mod_cfml-valve.jar /opt/lucee/lib/mod_cfml-value.jar
+          ls -l /opt/lucee/lib
+          sudo rm /opt/lucee/lib/mod_cfml-valve*
+          sudo cp mod_cfml-valve.jar /opt/lucee/lib/mod_cfml-valve.jar
           sudo cp lucee-${{ env.LUCEE_CORE }}.jar /opt/lucee/lib/lucee-${{ env.LUCEE_CORE }}.jar
           sudo /opt/lucee/lucee_ctl start
       - name: Run tests
