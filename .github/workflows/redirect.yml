@@ -8,13 +8,32 @@ on:
         required: true
         description: Lucee Version
         type: string
-        default: 6.2.2.9-SNAPSHOT
+        default: 6.2.2.76-SNAPSHOT
 
 env:
   LUCEE_INSTALLER_VERSION: 6.2.1.122
   PUSH_LUCEE_TEST_VERSION: 6.2.2.76-SNAPSHOT
   LUCEE_CORE:  ${{ github.event.inputs.LUCEE_CORE_VERSION }}
 jobs:
+  build-java:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'adopt'
+      - name: build
+        run: |
+          cd java/mod_cfml-valve
+          pwd
+          ant
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mod_cfml-valve.jar
+          path: java/mod_cfml-valve/dist/mod_cfml-valve.jar
   test-ubuntu-linux-x64:
     runs-on: ubuntu-latest
     steps:
@@ -71,12 +90,19 @@ jobs:
 
           sudo -u lucee bash -c 'echo "<cfscript>if (server.lucee.version neq url.version) header statusCode=500;</cfscript><cfoutput>###### Lucee Linux #server.lucee.version#, using Java #server.java.version##chr(10)####### Running on #server.servlet.name#, OS #server.os.version# #server.os.arch#</cfoutput>" > /opt/lucee/tomcat/webapps/ROOT/check.cfm'
 
+      - name: Download mod_valve artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mod_cfml-valve.jar
+
       - name: Restart Lucee
         run: |
           sudo systemctl reload apache2
           sudo /opt/lucee/lucee_ctl stop
           # replace loader jar, allows testing 6 and 7
           sudo rm /opt/lucee/lib/lucee-${{ env.LUCEE_INSTALLER_VERSION }}.jar
+          sudo rm /opt/lucee/lib/mod_cfml-valve_*
+          sudo cp mod_cfml-valve.jar /opt/lucee/lib/mod_cfml-value.jar
           sudo cp lucee-${{ env.LUCEE_CORE }}.jar /opt/lucee/lib/lucee-${{ env.LUCEE_CORE }}.jar
           sudo /opt/lucee/lucee_ctl start
       - name: Run tests
