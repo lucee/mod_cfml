@@ -58,7 +58,7 @@ import org.apache.catalina.LifecycleException;
 public class core extends ValveBase implements Serializable {
 
 
-	private String versionNumber = "2.0.0";
+	private String versionNumber = "2.0.1";
 
 	// declare configurable param defaults
 	private boolean loggingEnabled = false;
@@ -271,7 +271,7 @@ public class core extends ValveBase implements Serializable {
 			// meaning the setup did not work as expected.
 			// We do a redirect to try again, but also try to catch eternal redirects here, by adding a url parameter.
 			if (tcURIParams != null && tcURIParams.length() > redirectKey.length()
-					&& tcURIParams.substring(tcURIParams.length() - 1 - redirectKey.length()) == "&"+redirectKey) {
+					&& tcURIParams.endsWith("&" + redirectKey)) {
 				String msg = "Host [" + tcHost + "] already exists, but new requests still land at the localhost host.";
 				// host already exist? Skip this Valve.
 				if (loggingEnabled) {
