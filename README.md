@@ -1,11 +1,22 @@
 # mod_cfml
-Mod_cfml is a community-driven suite of programs that automatically configures Tomcat hosts to match hosts created in Apache or IIS. Mod_cfml removes the need to configure web sites twice - once in your web server and again in Tomcat - and performs this task automatically for you.
+Mod_cfml is a community-driven suite of programs that automatically configures Tomcat hosts to match hosts created in Apache or IIS. 
+
+Mod_cfml removes the need to configure web sites twice - once in your web server and again in Tomcat - and performs this task automatically for you.
 
 ### Lucee Fork as the old repo is abandoned
 
 Branches
-- **Master** is v2, with jakarta support, for Tomcat 10+
+
+- *master** is v2, with jakarta support, for Tomcat 10+
 - **v1-javax** is v1, supporting javax servlets, Tomcat 9 and earlier
+
+### Support
+
+As with all Lucee projects, issue tracking is all done in our jira, not per repo.
+
+Please post to the [developer forum](https://dev.lucee.org/) support, before creating tickets in jira.
+
+Issues: https://luceeserver.atlassian.net/issues/?jql=labels%20%3D%20%22modcfml%22
 
 ### Official Site
 
