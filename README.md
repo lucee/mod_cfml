@@ -10,6 +10,11 @@ Branches
 - *master** is v2, with jakarta support, for Tomcat 10+
 - **v1-javax** is v1, supporting javax servlets, Tomcat 9 and earlier
 
+Builds
+
+[![Java CI v1](https://github.com/lucee/mod_cfml/actions/workflows/ci.yml/badge.svg?branch=v1-javax)](https://github.com/lucee/mod_cfml/actions/workflows/ci.yml)
+[![Java CI v2](https://github.com/lucee/mod_cfml/actions/workflows/ci.yml/badge.svg)](https://github.com/lucee/mod_cfml/actions/workflows/ci.yml)
+
 ### Support
 
 As with all Lucee projects, issue tracking is all done in our jira, not per repo.
