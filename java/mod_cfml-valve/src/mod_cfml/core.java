@@ -272,7 +272,7 @@ public class core extends ValveBase implements Serializable {
 			// We do a redirect to try again, but also try to catch eternal redirects here, by adding a url parameter.
 			if (tcURIParams != null && tcURIParams.length() > redirectKey.length()
 					&& tcURIParams.substring(tcURIParams.length() - 1 - redirectKey.length()) == "&"+redirectKey) {
-				String msg = "Host [" + tcHost + "] already exists, but new requests still land at the localhost host.";
+				String msg = "Host [" + tcHost + "] already exists, but new requests still land at the localhost host. Main host is [" + tcMainHost + "]";
 				// host already exist? Skip this Valve.
 				if (loggingEnabled) {
 					System.out.println("[mod_cfml]["+logNr+"] FATAL: "+msg);
