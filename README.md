@@ -28,7 +28,7 @@ Installation and Configuration documentation can be found on the mod_cfml site h
 
 [http://viviotech.github.io/mod_cfml/](http://viviotech.github.io/mod_cfml/)
 
-Note that the previous modcfml.org site has been depreciated in favor of the GitHub site in order to better facilitate community contributions and updates.
+Note that the previous modcfml.org site has been deprecated in favor of the GitHub site in order to better facilitate community contributions and updates.
 
 ### Compiling the Apache module
 See [C/README.md](C/README.md) for instructions.
