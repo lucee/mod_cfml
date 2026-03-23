@@ -14,6 +14,9 @@ env:
   LUCEE_INSTALLER_VERSION: 6.2.1.122
   PUSH_LUCEE_TEST_VERSION: 6.2.2.76-SNAPSHOT
   LUCEE_CORE:  ${{ github.event.inputs.LUCEE_CORE_VERSION }}
+  LUCEE_WIN_INSTALLER_VERSION: 7.0.2.106
+  LUCEE_WIN_INSTALLER_URL: https://cdn.lucee.org/lucee-7.0.2.106-windows-x64-installer.exe
+  LUCEE_WIN_INSTALLER_EXE: lucee-7.0.2.106-windows-x64-installer.exe
 jobs:
   build-java:
     runs-on: ubuntu-latest
@@ -184,7 +187,7 @@ jobs:
             # Loop through all regular files recursively
             find "$directory" -type f | while IFS= read -r filepath; do
               filename=$(basename "$filepath")
-              
+
               echo "----------------------------------------"
               echo "File Name: $filename"
               echo "Full Path: $filepath"
@@ -193,3 +196,206 @@ jobs:
               echo "----------------------------------------"
               echo
             done
+
+  # ---------------------------------------------------------------------------
+  # LDEV-5723: localhost redirect loop regression tests
+  # ---------------------------------------------------------------------------
+  #
+  # The existing test-ubuntu-linux-x64 job hits Tomcat on port 8888 first,
+  # which pre-creates the localhost context before Apache ever touches it.
+  # That sidesteps the real-world problem: on a fresh install, the very first
+  # request arrives through the front-end webserver (Apache or IIS), and
+  # "localhost" already exists as Tomcat's default host.
+  #
+  # The valve sees findChild("localhost") return non-null, assumes the context
+  # is ready, and redirects. But the redirect lands right back at the same
+  # default host — there's no new context to land on. The valve fires again,
+  # appends another &__ to the URL, and we're in a loop.
+  #
+  # These two jobs reproduce that scenario: hit localhost through the front-end
+  # webserver FIRST, with no prior Tomcat warm-up. One via Apache on Linux,
+  # one via IIS/BonCode on Windows (the original reporter's setup).
+  #
+  # Both jobs enable valve logging so catalina.out captures the full
+  # [mod_cfml] trace — essential for diagnosing what the valve actually did.
+  #
+  # See: https://luceeserver.atlassian.net/browse/LDEV-5723
+  #      https://dev.lucee.org/t/novice-user-how-to-connect-lucee-to-iis/15049/12
+  # ---------------------------------------------------------------------------
+
+  test-localhost-apache:
+    runs-on: ubuntu-latest
+    needs: build-java
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set default version for Push workflows
+        if: github.event_name == 'push'
+        run: |
+          echo "LUCEE_CORE=${{ env.PUSH_LUCEE_TEST_VERSION }}" >> $GITHUB_ENV
+
+      - name: Cache Lucee Installer
+        uses: actions/cache@v4
+        with:
+          path: lucee-${{ env.LUCEE_INSTALLER_VERSION }}-linux-x64-installer.run
+          key: lucee-installer-cache
+
+      - name: Download Lucee Installer
+        run: |
+          if [ ! -f "lucee-${{ env.LUCEE_INSTALLER_VERSION }}-linux-x64-installer.run" ]; then
+            curl --fail https://cdn.lucee.org/lucee-${{ env.LUCEE_INSTALLER_VERSION }}-linux-x64-installer.run -o lucee-${{ env.LUCEE_INSTALLER_VERSION }}-linux-x64-installer.run -s
+          fi
+          ls -lH *.run
+
+      - name: Install Apache
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apache2
+          sudo systemctl start apache2
+          sudo systemctl enable apache2
+
+      - name: Run Lucee Linux installer
+        run: |
+          chmod +x lucee-${{ env.LUCEE_INSTALLER_VERSION }}-linux-x64-installer.run
+          sudo ./lucee-${{ env.LUCEE_INSTALLER_VERSION }}-linux-x64-installer.run \
+            --mode unattended --installconn true --installmodcfml true --installiis false --startatboot false \
+            --luceepass ibtest --systemuser lucee --installjre true
+          sudo -u lucee bash -c 'echo "<cfoutput>LDEV-5723 localhost test OK - Lucee #server.lucee.version#</cfoutput>" > /opt/lucee/tomcat/webapps/ROOT/check.cfm'
+
+      - name: Download mod_cfml valve artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mod_cfml-valve.jar
+
+      - name: Enable valve logging and restart
+        run: |
+          # Turn on valve logging so catalina.out shows the full [mod_cfml] trace.
+          # Without this, a redirect loop failure is a black box.
+          sudo sed -i 's/loggingEnabled="false"/loggingEnabled="true"/' /opt/lucee/tomcat/conf/server.xml
+          sudo systemctl reload apache2
+          sudo /opt/lucee/lucee_ctl stop
+          # Swap in the valve jar built from this branch
+          sudo rm /opt/lucee/tomcat/lib/mod_cfml-valve*
+          sudo cp mod_cfml-valve.jar /opt/lucee/tomcat/lib/mod_cfml-valve.jar
+          sudo /opt/lucee/lucee_ctl start
+          # Give Tomcat time to fully start — the valve needs to be loaded
+          # before the first request arrives
+          sleep 10
+
+      # This is THE test. Hit localhost through Apache before anything else.
+      # On a fresh install, "localhost" is already Tomcat's default host.
+      # The valve should handle this gracefully, not redirect-loop into a 508.
+      - name: "LDEV-5723: Test localhost through Apache FIRST (before any Tomcat direct access)"
+        run: |
+          echo "LDEV-5723: Hit localhost via Apache port 80 (no prior Tomcat warm-up)" | tee -a $GITHUB_STEP_SUMMARY
+          curl -v -L --max-redirs 5 http://localhost/check.cfm --fail-with-body 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+
+      # If the above passed, Tomcat direct should work too
+      - name: Sanity check Tomcat direct
+        run: |
+          echo "Sanity Check Tomcat port 8888" | tee -a $GITHUB_STEP_SUMMARY
+          curl http://127.0.0.1:8888/check.cfm --fail-with-body >> $GITHUB_STEP_SUMMARY
+
+      - name: Tomcat / Lucee logs
+        if: ${{ always() }}
+        run: |
+            echo "----- catalina.out (look for [mod_cfml] redirect loop trace)"
+            sudo [ -r /opt/lucee/tomcat/logs/catalina.out ] && sudo cat /opt/lucee/tomcat/logs/catalina.out
+            echo ""
+            echo "----- Tomcat conf/Catalina (context XML files created by valve)"
+            sudo find /opt/lucee/tomcat/conf/Catalina -type f -exec echo "--- {} ---" \; -exec cat {} \;
+
+      - name: Apache logs
+        if: ${{ always() }}
+        run: |
+            echo "----- error.log"
+            sudo -s cat /var/log/apache2/error.log
+            echo "----- access.log (look for repeated 307 redirects)"
+            sudo -s cat /var/log/apache2/access.log
+
+  # Same test, Windows path: IIS -> BonCode AJP -> Tomcat.
+  # This is the original reporter's environment (LDEV-5723).
+  # The Lucee Windows installer sets up BonCode + IIS + mod_cfml valve.
+  test-localhost-iis:
+    runs-on: windows-latest
+    needs: build-java
+    steps:
+      - name: Cache Lucee installer
+        id: cache-lucee
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.LUCEE_WIN_INSTALLER_EXE }}
+          key: lucee-win-installer-${{ env.LUCEE_WIN_INSTALLER_VERSION }}
+
+      - name: Download Lucee installer
+        if: steps.cache-lucee.outputs.cache-hit != 'true'
+        shell: cmd
+        run: curl --fail -L -o %LUCEE_WIN_INSTALLER_EXE% %LUCEE_WIN_INSTALLER_URL%
+
+      - name: Install IIS
+        shell: powershell
+        run: |
+          Install-WindowsFeature -Name Web-Server
+          Start-Service W3SVC
+          Write-Host "IIS installed and running"
+
+      # installmodcfml=true: installs the valve jar and configures it in server.xml
+      # installiis=true: sets up BonCode AJP connector for IIS -> Tomcat
+      - name: Run Lucee installer with IIS + mod_cfml
+        shell: cmd
+        run: |
+          %LUCEE_WIN_INSTALLER_EXE% --mode unattended --installconn false --installmodcfml true --installiis true --startatboot true --luceepass ibtest --installjre true
+
+      - name: Download mod_cfml valve artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mod_cfml-valve.jar
+
+      - name: Enable valve logging, replace valve jar, and restart
+        shell: powershell
+        run: |
+          # Turn on valve logging — same reason as the Apache job
+          $serverXml = "c:\lucee\tomcat\conf\server.xml"
+          (Get-Content $serverXml) -replace 'loggingEnabled="false"', 'loggingEnabled="true"' | Set-Content $serverXml
+          # Swap in the valve jar built from this branch
+          Remove-Item c:\lucee\tomcat\lib\mod_cfml-valve* -Force
+          Copy-Item mod_cfml-valve.jar c:\lucee\tomcat\lib\mod_cfml-valve.jar -Force
+          # Restart Tomcat (the Lucee installer registers it as a Windows service)
+          Stop-Service Luceetomcat -Force -ErrorAction SilentlyContinue
+          Start-Service Luceetomcat
+          # Windows + Lucee startup is slower than Linux
+          Start-Sleep -s 15
+
+      - name: Write test page
+        shell: cmd
+        run: |
+          echo ^<cfoutput^>LDEV-5723 localhost test OK - Lucee #server.lucee.version#^</cfoutput^> > c:\lucee\tomcat\webapps\ROOT\check.cfm
+
+      # THE test — same as the Apache job but through IIS/BonCode.
+      # Request path: curl -> IIS :80 -> BonCode AJP -> Tomcat -> mod_cfml valve
+      - name: "LDEV-5723: Test localhost through IIS FIRST (before any Tomcat direct access)"
+        shell: bash
+        run: |
+          echo "LDEV-5723: Hit localhost via IIS port 80 (no prior Tomcat warm-up)" | tee -a $GITHUB_STEP_SUMMARY
+          curl -v -L --max-redirs 5 http://localhost/check.cfm --fail-with-body 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+
+      - name: Sanity check Tomcat direct
+        shell: cmd
+        run: |
+          echo "Sanity Check Tomcat port 8888" >> %GITHUB_STEP_SUMMARY%
+          curl http://127.0.0.1:8888/check.cfm --fail-with-body >> %GITHUB_STEP_SUMMARY%
+
+      - name: Debug logs
+        if: ${{ always() }}
+        shell: cmd
+        run: |
+          echo "--- catalina.out (look for [mod_cfml] redirect loop trace) ---"
+          if exist "c:\lucee\tomcat\logs\catalina.out" type c:\lucee\tomcat\logs\catalina.out
+          echo "--- server.xml valve config ---"
+          findstr /i "mod_cfml" c:\lucee\tomcat\conf\server.xml
+          echo "--- BonCode logs ---"
+          if exist "c:\lucee\AJP13\BonCodeAJP13*.log" type c:\lucee\AJP13\BonCodeAJP13*.log
+          echo "--- Tomcat conf\Catalina (context XML files) ---"
+          dir /s c:\lucee\tomcat\conf\Catalina\
+          echo "--- BonCode DLLs ---"
+          dir c:\lucee\AJP13\*.dll
