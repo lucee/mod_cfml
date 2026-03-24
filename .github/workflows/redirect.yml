@@ -357,14 +357,15 @@ jobs:
           # Turn on valve logging — same reason as the Apache job
           $serverXml = "c:\lucee\tomcat\conf\server.xml"
           (Get-Content $serverXml) -replace 'loggingEnabled="false"', 'loggingEnabled="true"' | Set-Content $serverXml
-          # Stop Tomcat FIRST — Windows locks the jar while Tomcat is running
-          Stop-Service Luceetomcat -Force -ErrorAction SilentlyContinue
+          # Stop Tomcat FIRST — Windows locks the jar while Tomcat is running.
+          # Service name is "Lucee" (set by the installer's servicename parameter).
+          Stop-Service Lucee -Force
           Start-Sleep -s 5
           # Swap in the valve jar built from this branch
           Remove-Item c:\lucee\tomcat\lib\mod_cfml-valve* -Force
           Copy-Item mod_cfml-valve.jar c:\lucee\tomcat\lib\mod_cfml-valve.jar -Force
           # Restart Tomcat
-          Start-Service Luceetomcat
+          Start-Service Lucee
           # Windows + Lucee startup is slower than Linux
           Start-Sleep -s 15
 
